@@ -1,5 +1,6 @@
 import { useState } from "react";
 import TopBar from "@/components/chat/TopBar";
+import AppSidebar from "@/components/AppSidebar";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatArea from "@/components/chat/ChatArea";
 import EmptyState from "@/components/chat/EmptyState";
@@ -85,6 +86,7 @@ const initialMessages: Record<string, { id: string; content: string; time: strin
 const Index = () => {
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState(initialMessages);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const activeChat = conversations.find((c) => c.id === activeConversation);
   const currentMessages = activeConversation ? messages[activeConversation] || [] : [];
@@ -110,6 +112,10 @@ const Index = () => {
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
       <div className="flex-1 flex overflow-hidden">
+        <AppSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
         <ChatSidebar
           conversations={conversations}
           activeId={activeConversation}
