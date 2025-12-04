@@ -85,27 +85,20 @@ const initialMessages: Record<string, { id: string; content: string; time: strin
 
 const Index = () => {
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState(initialMessages);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const activeChat = conversations.find((c) => c.id === activeConversation);
-  const currentMessages = activeConversation ? messages[activeConversation] || [] : [];
+  const messages = activeConversation ? initialMessages[activeConversation] || [] : [];
 
   const handleSendMessage = (content: string) => {
     if (!activeConversation) return;
-    
-    const newMessage = {
-      id: Date.now().toString(),
-      content,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isSent: true,
-      isRead: false,
-    };
 
-    setMessages((prev) => ({
-      ...prev,
-      [activeConversation]: [...(prev[activeConversation] || []), newMessage],
-    }));
+    // For now, just log the message (we'll implement actual sending later)
+    console.log('Sending message:', {
+      to: activeConversation,
+      content,
+      timestamp: Date.now()
+    });
   };
 
   return (
@@ -126,7 +119,7 @@ const Index = () => {
             name={activeChat.name}
             avatar={activeChat.avatar}
             isOnline={activeChat.isOnline}
-            messages={currentMessages}
+            messages={messages}
             onSendMessage={handleSendMessage}
           />
         ) : (

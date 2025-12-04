@@ -16,6 +16,7 @@ interface ChatSidebarProps {
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  isLoading?: boolean;
 }
 
 const ChatSidebar = ({ conversations, activeId, onSelect }: ChatSidebarProps) => {
