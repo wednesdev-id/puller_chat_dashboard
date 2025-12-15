@@ -4,8 +4,7 @@ import {
   Inbox,
   MessageSquare,
   Mail,
-  Star,
-  Clock,
+    Clock,
   CalendarClock,
   ListChecks,
   FileText,
@@ -44,11 +43,10 @@ const menuSections: MenuSection[] = [
   {
     icon: Inbox,
     label: "Inbox",
-    badge: 12,
+    badge: 0, // Will be calculated dynamically
     items: [
-      { icon: MessageSquare, label: "All Chats", badge: 12 },
-      { icon: Mail, label: "Unread", badge: 5 },
-      { icon: Star, label: "Priority", badge: 2 },
+      { icon: MessageSquare, label: "All Chats", badge: 0 }, // Will be calculated dynamically
+      { icon: Mail, label: "Unread", badge: 0 }, // Will be calculated dynamically
     ],
   },
   {
@@ -100,11 +98,34 @@ const menuSections: MenuSection[] = [
 interface AppSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
+  totalChats?: number;
+  unreadCount?: number;
+  onNavigationClick?: (itemLabel: string) => void;
 }
 
-const AppSidebar = ({ collapsed = false, onToggle }: AppSidebarProps) => {
+const AppSidebar = ({ collapsed = false, onToggle, totalChats = 0, unreadCount = 0, onNavigationClick }: AppSidebarProps) => {
   const [expandedSections, setExpandedSections] = useState<string[]>(["Inbox"]);
   const [activeItem, setActiveItem] = useState("All Chats");
+
+  // Create dynamic menu sections with real counts
+  const dynamicMenuSections: MenuSection[] = menuSections.map(section => {
+    if (section.label === "Inbox") {
+      return {
+        ...section,
+        badge: totalChats,
+        items: section.items?.map(item => {
+          if (item.label === "All Chats") {
+            return { ...item, badge: totalChats };
+          }
+          if (item.label === "Unread") {
+            return { ...item, badge: unreadCount };
+          }
+          return item;
+        })
+      };
+    }
+    return section;
+  });
 
   const toggleSection = (label: string) => {
     setExpandedSections((prev) =>
@@ -143,7 +164,7 @@ const AppSidebar = ({ collapsed = false, onToggle }: AppSidebarProps) => {
 
       {/* Menu Sections */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-        {menuSections.map((section) => (
+        {dynamicMenuSections.map((section) => (
           <div key={section.label}>
             <button
               onClick={() => section.items && toggleSection(section.label)}
@@ -166,7 +187,7 @@ const AppSidebar = ({ collapsed = false, onToggle }: AppSidebarProps) => {
               {!collapsed && (
                 <>
                   <span className="flex-1 text-left">{section.label}</span>
-                  {section.badge && (
+                  {section.badge && section.badge > 0 && (
                     <span className="px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full">
                       {section.badge}
                     </span>
@@ -189,7 +210,12 @@ const AppSidebar = ({ collapsed = false, onToggle }: AppSidebarProps) => {
                 {section.items.map((item) => (
                   <button
                     key={item.label}
-                    onClick={() => setActiveItem(item.label)}
+                    onClick={() => {
+                      setActiveItem(item.label);
+                      if (onNavigationClick) {
+                        onNavigationClick(item.label);
+                      }
+                    }}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                       activeItem === item.label
@@ -199,7 +225,7 @@ const AppSidebar = ({ collapsed = false, onToggle }: AppSidebarProps) => {
                   >
                     <item.icon className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left">{item.label}</span>
-                    {item.badge && (
+                    {item.badge && item.badge > 0 && (
                       <span
                         className={cn(
                           "px-1.5 py-0.5 text-xs font-medium rounded-full",

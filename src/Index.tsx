@@ -6,7 +6,7 @@ import ChatArea from "@/components/chat/ChatArea";
 import EmptyState from "@/components/chat/EmptyState";
 
 // Sample data
-const conversations = [
+const initialConversations = [
   {
     id: "1",
     name: "Sarah Chen",
@@ -86,9 +86,42 @@ const initialMessages: Record<string, { id: string; content: string; time: strin
 const Index = () => {
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [conversations, setConversations] = useState(initialConversations); // Track conversations with read/unread state
+  const [activeFilter, setActiveFilter] = useState<"all" | "unread">("all"); // Track current filter
 
   const activeChat = conversations.find((c) => c.id === activeConversation);
   const messages = activeConversation ? initialMessages[activeConversation] || [] : [];
+
+  // Calculate notification counts
+  const unreadCount = conversations.reduce((sum, conv) => sum + (conv.unread || 0), 0);
+
+  // Filter conversations based on active filter
+  const filteredConversations = activeFilter === "unread"
+    ? conversations.filter(conv => (conv.unread || 0) > 0)
+    : conversations;
+
+  // Handle conversation selection to mark as read
+  const handleConversationSelect = (conversationId: string) => {
+    setActiveConversation(conversationId);
+
+    // Mark the conversation as read (set unread to 0)
+    setConversations(prevConversations =>
+      prevConversations.map(conv =>
+        conv.id === conversationId
+          ? { ...conv, unread: 0 }
+          : conv
+      )
+    );
+  };
+
+  // Handle navigation item clicks
+  const handleNavigationClick = (itemLabel: string) => {
+    if (itemLabel === "All Chats") {
+      setActiveFilter("all");
+    } else if (itemLabel === "Unread") {
+      setActiveFilter("unread");
+    }
+  };
 
   const handleSendMessage = (content: string) => {
     if (!activeConversation) return;
@@ -108,11 +141,14 @@ const Index = () => {
         <AppSidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          totalChats={unreadCount}
+          unreadCount={unreadCount}
+          onNavigationClick={handleNavigationClick}
         />
         <ChatSidebar
-          conversations={conversations}
+          conversations={filteredConversations}
           activeId={activeConversation}
-          onSelect={setActiveConversation}
+          onSelect={handleConversationSelect}
         />
         {activeChat ? (
           <ChatArea
