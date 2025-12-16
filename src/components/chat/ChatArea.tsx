@@ -17,9 +17,11 @@ interface ChatAreaProps {
   isOnline: boolean;
   messages: Message[];
   onSendMessage: (message: string) => void;
+  isLoading?: boolean;
+  isConnected?: boolean;
 }
 
-const ChatArea = ({ name, avatar, isOnline, messages, onSendMessage }: ChatAreaProps) => {
+const ChatArea = ({ name, avatar, isOnline, messages, onSendMessage, isLoading = false, isConnected = true }: ChatAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,13 +31,13 @@ const ChatArea = ({ name, avatar, isOnline, messages, onSendMessage }: ChatAreaP
   return (
     <div className="flex-1 flex flex-col h-full bg-background">
       <ChatHeader name={name} avatar={avatar} isOnline={isOnline} />
-      
+
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+        <div className="max-w-none sm:max-w-2xl lg:max-w-3xl mx-auto space-y-3 sm:space-y-4">
           {/* Date Separator */}
           <div className="flex items-center justify-center">
-            <span className="px-3 py-1 bg-secondary rounded-full text-xs text-muted-foreground">
+            <span className="px-2.5 sm:px-3 py-1 bg-secondary rounded-full text-xs text-muted-foreground">
               Today
             </span>
           </div>
@@ -54,8 +56,14 @@ const ChatArea = ({ name, avatar, isOnline, messages, onSendMessage }: ChatAreaP
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto w-full">
-        <MessageInput onSend={onSendMessage} />
+      <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-t border-border bg-background">
+        <div className="max-w-none sm:max-w-2xl lg:max-w-3xl mx-auto w-full">
+          <MessageInput
+            onSend={onSendMessage}
+            isConnected={isConnected}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
     </div>
   );

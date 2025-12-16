@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TopBar from "@/components/chat/TopBar";
 import AppSidebar from "@/components/AppSidebar";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatArea from "@/components/chat/ChatArea";
 import EmptyState from "@/components/chat/EmptyState";
+import WhatsAppConnection from "@/components/WhatsAppConnection";
+import { useWhatsAppChats, useWhatsAppMessages, useWhatsAppSession, useWhatsAppRealtime } from "@/hooks/useWhatsApp";
 
 // Sample data
 const initialConversations = [
@@ -84,13 +86,42 @@ const initialMessages: Record<string, { id: string; content: string; time: strin
 };
 
 const Index = () => {
+  // WhatsApp hooks
+  const { connectionStatus } = useWhatsAppSession();
+  const { chats, isLoading: chatsLoading, hasActiveSession } = useWhatsAppChats();
+  const { messages, sendMessage, isSending } = useWhatsAppMessages();
+
+  // Initialize real-time connection
+  useWhatsAppRealtime();
+
+  // Local state
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [conversations, setConversations] = useState(initialConversations); // Track conversations with read/unread state
-  const [activeFilter, setActiveFilter] = useState<"all" | "unread">("all"); // Track current filter
+  const [activeFilter, setActiveFilter] = useState<"all" | "unread">("all");
+  const [showWhatsAppConnection, setShowWhatsAppConnection] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Check if WhatsApp is truly connected (not just session exists)
+  useEffect(() => {
+    // Check if connection is established through QR code scan
+    const checkRealConnection = () => {
+      if (connectionStatus === 'connected' && hasActiveSession) {
+        setIsConnected(true);
+        setShowWhatsAppConnection(false);
+      } else {
+        setIsConnected(false);
+        setShowWhatsAppConnection(true);
+      }
+    };
+
+    checkRealConnection();
+  }, [connectionStatus, hasActiveSession]);
+
+  // Use WhatsApp chats if truly connected through QR code, otherwise use sample data
+  const conversations = isConnected ? chats : initialConversations;
+  const currentMessages = messages || [];
 
   const activeChat = conversations.find((c) => c.id === activeConversation);
-  const messages = activeConversation ? initialMessages[activeConversation] || [] : [];
 
   // Calculate notification counts
   const unreadCount = conversations.reduce((sum, conv) => sum + (conv.unread || 0), 0);
@@ -100,18 +131,9 @@ const Index = () => {
     ? conversations.filter(conv => (conv.unread || 0) > 0)
     : conversations;
 
-  // Handle conversation selection to mark as read
+  // Handle conversation selection
   const handleConversationSelect = (conversationId: string) => {
     setActiveConversation(conversationId);
-
-    // Mark the conversation as read (set unread to 0)
-    setConversations(prevConversations =>
-      prevConversations.map(conv =>
-        conv.id === conversationId
-          ? { ...conv, unread: 0 }
-          : conv
-      )
-    );
   };
 
   // Handle navigation item clicks
@@ -120,18 +142,17 @@ const Index = () => {
       setActiveFilter("all");
     } else if (itemLabel === "Unread") {
       setActiveFilter("unread");
+    } else if (itemLabel === "WhatsApp Connection") {
+      setShowWhatsAppConnection(!showWhatsAppConnection);
     }
   };
 
+  // Handle sending messages
   const handleSendMessage = (content: string) => {
-    if (!activeConversation) return;
+    if (!activeConversation || !isConnected) return;
 
-    // For now, just log the message (we'll implement actual sending later)
-    console.log('Sending message:', {
-      to: activeConversation,
-      content,
-      timestamp: Date.now()
-    });
+    // Send message using WhatsApp service
+    sendMessage(content);
   };
 
   return (
@@ -145,21 +166,34 @@ const Index = () => {
           unreadCount={unreadCount}
           onNavigationClick={handleNavigationClick}
         />
-        <ChatSidebar
-          conversations={filteredConversations}
-          activeId={activeConversation}
-          onSelect={handleConversationSelect}
-        />
-        {activeChat ? (
-          <ChatArea
-            name={activeChat.name}
-            avatar={activeChat.avatar}
-            isOnline={activeChat.isOnline}
-            messages={messages}
-            onSendMessage={handleSendMessage}
-          />
+
+        {showWhatsAppConnection ? (
+          <WhatsAppConnection />
         ) : (
-          <EmptyState />
+          <>
+            <ChatSidebar
+              conversations={filteredConversations}
+              activeId={activeConversation}
+              onSelect={handleConversationSelect}
+              isLoading={chatsLoading}
+            />
+            {activeChat ? (
+              <ChatArea
+                name={activeChat.name}
+                avatar={activeChat.avatar}
+                isOnline={activeChat.isOnline}
+                messages={currentMessages}
+                onSendMessage={handleSendMessage}
+                isLoading={isSending}
+                isConnected={isConnected}
+              />
+            ) : (
+              <EmptyState
+                showConnectPrompt={!isConnected}
+                onConnect={() => setShowWhatsAppConnection(true)}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
