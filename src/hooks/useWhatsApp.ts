@@ -24,7 +24,8 @@ export const useWhatsAppSession = () => {
     mutationFn: () => wahaService.startSession('default'),
     onSuccess: (data) => {
       console.log('Session started:', data);
-      setActiveSessionId(data.id);
+      const sessionId = data.id || data.session || data.name || 'default';
+      setActiveSessionId(sessionId);
       setConnectionStatus('connecting');
 
       // Open WAHA dashboard for QR scanning
@@ -32,7 +33,7 @@ export const useWhatsAppSession = () => {
 
       // Start polling for status updates
       setTimeout(() => {
-        pollConnectionStatus(data.id);
+        pollConnectionStatus(sessionId);
       }, 2000);
     },
     onError: (error) => {
@@ -62,7 +63,8 @@ export const useWhatsAppSession = () => {
 
       if (status.status === 'CONNECTED') {
         setConnectionStatus('connected');
-        setActiveSessionId(sessionId);
+        const activeId = status.id || status.session || status.name || sessionId;
+        setActiveSessionId(activeId);
         queryClient.invalidateQueries({ queryKey: ['whatsapp-sessions'] });
         return; // Stop polling
       } else if (status.status === 'DISCONNECTED') {
@@ -80,11 +82,32 @@ export const useWhatsAppSession = () => {
     }
   }, [queryClient]);
 
-  // Start WhatsApp connection
-  const startWhatsApp = useCallback(async () => {
-    setConnectionStatus('connecting');
-    startConnectionMutation.mutate();
-  }, [startConnectionMutation]);
+  // Auto-setup WhatsApp connection
+  const autoSetupWhatsApp = useCallback(async () => {
+    try {
+      setConnectionStatus('connecting');
+
+      // Run auto-setup
+      const { qrCode, sessionId } = await wahaService.autoSetup();
+
+      console.log('Auto-setup successful:', { sessionId, hasQR: !!qrCode });
+
+      setActiveSessionId(sessionId);
+
+      // Open WAHA dashboard for QR scanning
+      wahaService.openDashboard();
+
+      // Start polling for status updates
+      setTimeout(() => {
+        pollConnectionStatus(sessionId);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Auto-setup failed:', error);
+      setConnectionStatus('disconnected');
+      throw error;
+    }
+  }, [pollConnectionStatus]);
 
   // Disconnect session
   const disconnectSession = useCallback(async (sessionId: string) => {
@@ -107,7 +130,8 @@ export const useWhatsAppSession = () => {
     connectionStatus,
     isLoading: sessionsLoading || startConnectionMutation.isPending,
     isDisconnecting: disconnectMutation.isPending,
-    startWhatsApp,
+    startWhatsApp: () => startConnectionMutation.mutate('default'),
+    autoSetupWhatsApp,
     disconnectSession,
     testConnection,
     openDashboard,

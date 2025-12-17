@@ -12,8 +12,14 @@ const WAHA_CONFIG = {
 
 // Type definitions
 export interface WhatsAppSession {
-  id: string;
+  id?: string;
+  session?: string;
+  name?: string;
   status: 'STARTING' | 'QR' | 'AUTHENTICATED' | 'CONNECTED' | 'DISCONNECTED';
+  me?: any;
+  presence?: any;
+  timestamps?: any;
+  engine?: any;
 }
 
 export interface WhatsAppMessage {
@@ -100,14 +106,25 @@ export class WAHAService {
     }
   }
 
-  // Start session
+  // Start session or get existing
   async startSession(sessionName: string = 'default'): Promise<WhatsAppSession> {
     try {
+      // Try to start new session first
       const response = await this.apiClient.post('/api/sessions/start', {
+        session: sessionName,
         name: sessionName,
       });
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // If session already exists, get existing session
+      if (error.response?.status === 422 && error.response?.data?.message?.includes('already started')) {
+        const sessions = await this.getSessions();
+        const existingSession = sessions.find(s => s.name === sessionName || s.session === sessionName);
+        if (existingSession) {
+          console.log('Using existing session:', existingSession);
+          return existingSession;
+        }
+      }
       console.error('Failed to start session:', error);
       throw error;
     }
@@ -126,10 +143,74 @@ export class WAHAService {
   // Get session status
   async getSessionStatus(sessionId: string): Promise<WhatsAppSession> {
     try {
-      const response = await this.apiClient.get(`/api/sessions/${sessionId}/status`);
-      return response.data;
+      // Try specific session endpoint first
+      try {
+        const response = await this.apiClient.get(`/api/sessions/${sessionId}/status`);
+        return response.data;
+      } catch {
+        // If specific endpoint fails, get all sessions and find the one we want
+        const sessions = await this.getSessions();
+        const session = sessions.find(s =>
+          s.id === sessionId || s.session === sessionId || s.name === sessionId
+        );
+        if (session) {
+          return session;
+        }
+        throw new Error(`Session ${sessionId} not found`);
+      }
     } catch (error) {
       console.error('Failed to get session status:', error);
+      throw error;
+    }
+  }
+
+  // Get QR code
+  async getQRCode(): Promise<string> {
+    try {
+      const response = await this.apiClient.get('/api/screenshot', {
+        responseType: 'text',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get QR code:', error);
+      throw error;
+    }
+  }
+
+  // Auto-setup API key and session
+  async autoSetup(): Promise<{ qrCode: string; sessionId: string }> {
+    try {
+      console.log('Starting auto-setup for WAHA connection...');
+
+      // Step 1: Test connection to WAHA server
+      const testResponse = await this.apiClient.get('/api/sessions');
+      console.log('WAHA server connection successful');
+
+      // Step 2: Get existing sessions or create new one
+      const sessions = await this.getSessions();
+      let sessionId = 'default';
+
+      if (sessions.length > 0) {
+        sessionId = sessions[0].session || sessions[0].name || sessions[0].id || 'default';
+        console.log('Using existing session:', sessionId);
+      } else {
+        console.log('Creating new session...');
+        const session = await this.startSession('default');
+        sessionId = session.session || session.name || session.id || 'default';
+        console.log('New session created:', sessionId);
+      }
+
+      // Step 3: Get QR code
+      console.log('Getting QR code...');
+      const qrCode = await this.getQRCode();
+      console.log('QR code retrieved successfully');
+
+      return {
+        qrCode,
+        sessionId
+      };
+    } catch (error) {
+      console.error('Auto-setup failed:', error);
       throw error;
     }
   }

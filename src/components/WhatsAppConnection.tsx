@@ -17,11 +17,16 @@ const WhatsAppConnection = () => {
     isLoading,
     isDisconnecting,
     startWhatsApp,
+    autoSetupWhatsApp,
     disconnectSession,
     openDashboard,
   } = useWhatsAppSession();
 
   const activeSession = sessions[0];
+
+  const handleAutoSetup = () => {
+    autoSetupWhatsApp();
+  };
 
   const handleStartConnection = () => {
     startWhatsApp();
@@ -145,23 +150,27 @@ const WhatsAppConnection = () => {
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
               </div>
               <div className="space-y-2">
-                <h3 className="font-medium text-blue-900">Connecting to WhatsApp...</h3>
+                <h3 className="font-medium text-blue-900">Auto-setting up connection...</h3>
                 <p className="text-sm text-blue-700">
-                  Please scan the QR code in the WAHA dashboard that opened
+                  API key configured and QR code ready for scanning
                 </p>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-left">
-                    <p className="font-medium text-blue-900">Next Steps:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-800 mt-1">
-                      <li>WAHA dashboard should have opened in a new tab</li>
-                      <li>Click "POST /api/sessions" → Execute</li>
-                      <li>Use <code>default</code> as session name</li>
-                      <li>Scan QR code with your WhatsApp mobile app</li>
-                      <li>Wait for connection to be established</li>
-                    </ol>
+                <div className="text-left text-xs text-blue-800">
+                  <p className="font-medium mb-2">Auto-Setup Progress:</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>✓ API Key configured</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>✓ Session created/loaded</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span>⏳ Waiting for QR scan...</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -183,37 +192,57 @@ const WhatsAppConnection = () => {
               <div className="space-y-2">
                 <h3 className="font-medium text-gray-900">Connect to WhatsApp</h3>
                 <p className="text-sm text-gray-600">
-                  Connect your WhatsApp account using WAHA server
+                  Auto-setup API key and QR code in one click
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
                 <Button
-                  onClick={handleStartConnection}
+                  onClick={handleAutoSetup}
                   disabled={isLoading}
-                  className="text-sm"
+                  className="text-sm w-full"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Connecting...
+                      Auto-Setting Up...
                     </>
                   ) : (
                     <>
                       <Smartphone className="w-4 h-4 mr-2" />
-                      Connect
+                      Auto-Setup & Connect
                     </>
                   )}
                 </Button>
-                <Button
-                  onClick={handleOpenDashboard}
-                  variant="outline"
-                  className="text-sm"
-                  disabled={isLoading}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Dashboard
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleStartConnection}
+                    variant="outline"
+                    disabled={isLoading}
+                    className="text-sm"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-4 h-4 mr-2" />
+                        Manual
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleOpenDashboard}
+                    variant="outline"
+                    className="text-sm"
+                    disabled={isLoading}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </Button>
+                </div>
               </div>
             </div>
           )}
