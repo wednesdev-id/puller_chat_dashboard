@@ -37,6 +37,9 @@ export interface WhatsAppChat {
   lastMessage?: WhatsAppMessage;
   timestamp: number;
   isGroup: boolean;
+  avatar?: string;
+  time?: string;
+  lastMessageContent?: string;
 }
 
 // WAHA Service Class
@@ -54,10 +57,6 @@ export class WAHAService {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key': WAHA_CONFIG.apiKey,
-      },
-      auth: {
-        username: WAHA_CONFIG.username,
-        password: WAHA_CONFIG.password,
       },
     });
 
@@ -143,21 +142,19 @@ export class WAHAService {
   // Get session status
   async getSessionStatus(sessionId: string): Promise<WhatsAppSession> {
     try {
-      // Try specific session endpoint first
-      try {
-        const response = await this.apiClient.get(`/api/sessions/${sessionId}/status`);
-        return response.data;
-      } catch {
-        // If specific endpoint fails, get all sessions and find the one we want
-        const sessions = await this.getSessions();
-        const session = sessions.find(s =>
-          s.id === sessionId || s.session === sessionId || s.name === sessionId
-        );
-        if (session) {
-          return session;
-        }
-        throw new Error(`Session ${sessionId} not found`);
+      // Get all sessions and find the one we want
+      const sessions = await this.getSessions();
+      const session = sessions.find(s =>
+        s.id === sessionId || s.session === sessionId || s.name === sessionId
+      );
+      if (session) {
+        return session;
       }
+      // If no specific session found, return the first available session
+      if (sessions.length > 0) {
+        return sessions[0];
+      }
+      throw new Error(`Session ${sessionId} not found`);
     } catch (error) {
       console.error('Failed to get session status:', error);
       throw error;
@@ -183,7 +180,7 @@ export class WAHAService {
       console.log('Starting auto-setup for WAHA connection...');
 
       // Step 1: Test connection to WAHA server
-      const testResponse = await this.apiClient.get('/api/sessions');
+      await this.apiClient.get('/api/sessions');
       console.log('WAHA server connection successful');
 
       // Step 2: Get existing sessions or create new one
@@ -211,6 +208,53 @@ export class WAHAService {
       };
     } catch (error) {
       console.error('Auto-setup failed:', error);
+      throw error;
+    }
+  }
+
+  // Get WhatsApp chats
+  async getChats(sessionId?: string): Promise<WhatsAppChat[]> {
+    try {
+      // WAHA uses /api/sessions/{sessionId}/chats for chats
+      const url = sessionId ? `/api/sessions/${sessionId}/chats` : '/api/chats';
+      const response = await this.apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get chats:', error);
+      return [];
+    }
+  }
+
+  // Get messages from a chat
+  async getMessages(chatId: string, sessionId?: string, limit: number = 50): Promise<WhatsAppMessage[]> {
+    try {
+      // WAHA uses /api/sessions/{sessionId}/chats/{chatId} for messages
+      const url = sessionId
+        ? `/api/sessions/${sessionId}/chats/${chatId}?messages=${limit}`
+        : `/api/chats/${chatId}?messages=${limit}`;
+      const response = await this.apiClient.get(url);
+      return response.data.messages || [];
+    } catch (error) {
+      console.error('Failed to get messages:', error);
+      return [];
+    }
+  }
+
+  // Send message
+  async sendMessage(chatId: string, content: string, sessionId?: string): Promise<WhatsAppMessage> {
+    try {
+      // WAHA uses POST /api/sessions/{sessionId}/chats/{chatId}/messages
+      const url = sessionId
+        ? `/api/sessions/${sessionId}/chats/${chatId}/messages`
+        : `/api/chats/${chatId}/messages`;
+
+      const response = await this.apiClient.post(url, {
+        text: content,
+        session: sessionId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send message:', error);
       throw error;
     }
   }

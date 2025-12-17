@@ -6,6 +6,7 @@ import ChatArea from "@/components/chat/ChatArea";
 import EmptyState from "@/components/chat/EmptyState";
 import WhatsAppConnection from "@/components/WhatsAppConnection";
 import { useWhatsAppChats, useWhatsAppMessages, useWhatsAppSession, useWhatsAppRealtime } from "@/hooks/useWhatsApp";
+import { WhatsAppMessage } from "@/services/wahaService";
 
 // Sample data
 const initialConversations = [
@@ -105,10 +106,17 @@ const Index = () => {
   useEffect(() => {
     // Check if connection is established through QR code scan
     const checkRealConnection = () => {
+      console.log('Connection check:', { connectionStatus, hasActiveSession, showWhatsAppConnection });
       if (connectionStatus === 'connected' && hasActiveSession) {
+        console.log('WhatsApp is connected, redirecting to dashboard...');
         setIsConnected(true);
         setShowWhatsAppConnection(false);
+      } else if (connectionStatus === 'connecting') {
+        // Still connecting, show WhatsApp connection page
+        setIsConnected(false);
+        setShowWhatsAppConnection(true);
       } else {
+        // Not connected, show WhatsApp connection page
         setIsConnected(false);
         setShowWhatsAppConnection(true);
       }
@@ -117,9 +125,39 @@ const Index = () => {
     checkRealConnection();
   }, [connectionStatus, hasActiveSession]);
 
+  // Transform WhatsApp data to match chat component format
+  const transformWhatsAppChats = (whatsappChats: any[]) => {
+    console.log('Transforming WhatsApp chats:', whatsappChats);
+    return whatsappChats.map(chat => {
+      const chatName = chat.name || chat.pushname || (chat.isGroup ? `Group ${chat.id.slice(-6)}` : `Contact ${chat.id.slice(-6)}`);
+      const lastMsg = chat.lastMessage || chat.last_message;
+      return {
+        id: chat.id || chat._serialized || chat.chat_id,
+        name: chatName,
+        avatar: chat.avatar || chat.profilePicUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(chatName)}&background=random`,
+        lastMessage: chat.lastMessageContent || lastMsg?.body || lastMsg?.content || lastMsg?.text || 'No messages yet',
+        time: chat.time || new Date(chat.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        unread: chat.unreadCount || chat.unread || 0,
+        isOnline: false // WhatsApp doesn't provide online status through WAHA API
+      };
+    });
+  };
+
+  // Transform WhatsApp messages to match chat component format
+  const transformWhatsAppMessages = (whatsappMessages: WhatsAppMessage[]) => {
+    console.log('Transforming WhatsApp messages:', whatsappMessages);
+    return whatsappMessages.map(msg => ({
+      id: msg.id || msg._serialized || msg.message_id,
+      content: msg.content || msg.body || msg.text || '',
+      time: new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSent: msg.fromMe || msg.from_me || false,
+      isRead: true // WAHA doesn't provide read status
+    }));
+  };
+
   // Use WhatsApp chats if truly connected through QR code, otherwise use sample data
-  const conversations = isConnected ? chats : initialConversations;
-  const currentMessages = messages || [];
+  const conversations = isConnected && chats.length > 0 ? transformWhatsAppChats(chats) : initialConversations;
+  const currentMessages = messages.length > 0 ? transformWhatsAppMessages(messages) : [];
 
   const activeChat = conversations.find((c) => c.id === activeConversation);
 

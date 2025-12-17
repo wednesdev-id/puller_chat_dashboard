@@ -141,7 +141,9 @@ export const useWhatsAppSession = () => {
 
 // Hook for WhatsApp chats (for other components that might need it)
 export const useWhatsAppChats = () => {
-  const { activeSessionId } = useWhatsAppSession();
+  const { sessions, connectionStatus } = useWhatsAppSession();
+  const activeSession = sessions[0]; // Get first available session
+  const activeSessionId = activeSession?.session || activeSession?.id || activeSession?.name;
 
   const {
     data: chats = [],
@@ -150,11 +152,22 @@ export const useWhatsAppChats = () => {
     refetch: refetchChats,
   } = useQuery<WhatsAppChat[]>({
     queryKey: ['whatsapp-chats', activeSessionId],
-    queryFn: () => {
-      if (!activeSessionId) return [];
-      return []; // Return empty array for now
+    queryFn: async () => {
+      if (!activeSessionId || connectionStatus !== 'connected') {
+        console.log('Chats: No active session or not connected', { activeSessionId, connectionStatus });
+        return [];
+      }
+      console.log('Chats: Fetching chats for session', activeSessionId);
+      try {
+        const chatsData = await wahaService.getChats(activeSessionId);
+        console.log('Chats: Retrieved', chatsData.length, 'chats');
+        return chatsData;
+      } catch (error) {
+        console.error('Chats: Failed to fetch chats', error);
+        return [];
+      }
     },
-    enabled: !!activeSessionId,
+    enabled: !!activeSessionId && connectionStatus === 'connected',
     refetchInterval: 10000,
   });
 
@@ -163,13 +176,15 @@ export const useWhatsAppChats = () => {
     isLoading: chatsLoading,
     error: chatsError,
     refetchChats,
-    hasActiveSession: !!activeSessionId,
+    hasActiveSession: !!activeSessionId && connectionStatus === 'connected',
   };
 };
 
 // Hook for WhatsApp messages (for other components that might need it)
 export const useWhatsAppMessages = (chatId?: string) => {
-  const { activeSessionId } = useWhatsAppSession();
+  const { sessions, connectionStatus } = useWhatsAppSession();
+  const activeSession = sessions[0]; // Get first available session
+  const activeSessionId = activeSession?.session || activeSession?.id || activeSession?.name;
   const queryClient = useQueryClient();
 
   const {
@@ -179,27 +194,48 @@ export const useWhatsAppMessages = (chatId?: string) => {
     refetch: refetchMessages,
   } = useQuery({
     queryKey: ['whatsapp-messages', activeSessionId, chatId],
-    queryFn: () => {
-      if (!activeSessionId || !chatId) return [];
-      return []; // Return empty array for now
+    queryFn: async () => {
+      if (!activeSessionId || !chatId || connectionStatus !== 'connected') {
+        console.log('Messages: No active session, chat, or not connected', { activeSessionId, chatId, connectionStatus });
+        return [];
+      }
+      console.log('Messages: Fetching messages for chat', chatId, 'session', activeSessionId);
+      try {
+        const messagesData = await wahaService.getMessages(chatId, activeSessionId);
+        console.log('Messages: Retrieved', messagesData.length, 'messages');
+        return messagesData;
+      } catch (error) {
+        console.error('Messages: Failed to fetch messages', error);
+        return [];
+      }
     },
-    enabled: !!activeSessionId && !!chatId,
+    enabled: !!activeSessionId && !!chatId && connectionStatus === 'connected',
     refetchInterval: 5000,
   });
 
+  const sendMessageMutation = useMutation({
+    mutationFn: (content: string) => {
+      if (!activeSessionId || !chatId) throw new Error('No active session or chat');
+      console.log('Messages: Sending message to', chatId, 'session', activeSessionId);
+      return wahaService.sendMessage(chatId, content, activeSessionId);
+    },
+    onSuccess: () => {
+      console.log('Messages: Message sent successfully');
+      // Invalidate messages query after sending
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', activeSessionId, chatId] });
+    },
+  });
+
   const sendMessage = useCallback((content: string) => {
-    console.log('Message sent to', chatId, ':', content);
-    // Invalidate messages query after sending (when API is ready)
-    queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', activeSessionId, chatId] });
-    // TODO: Implement actual message sending when API is ready
-  }, [chatId, activeSessionId, queryClient]);
+    sendMessageMutation.mutate(content);
+  }, [sendMessageMutation]);
 
   return {
     messages,
     isLoading: messagesLoading,
     error: messagesError,
     sendMessage,
-    isSending: false,
+    isSending: sendMessageMutation.isPending,
     refetchMessages,
   };
 };
